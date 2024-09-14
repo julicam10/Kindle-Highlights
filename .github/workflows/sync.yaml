@@ -1,29 +1,35 @@
-name: Sync Kindle Highlights
+name: Create and publish the Docker image
+
 on: [push, workflow_dispatch]
+
 jobs:
-  sync-highlights:
+  build-and-push-image:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Sync highlights
-        uses: addnab/docker-run-action@v3
+      - name: Log in to the Container registry
+        uses: docker/login-action@v2
         with:
-          image: ghcr.io/arkalim/kindle-to-notion:master
-          run: node /code/dist/main.js
-          options: |
-            -v ${{ github.workspace }}:/code/resources 
-            -e BOOK_DB_ID=${{ vars.BOOK_DB_ID }}
-            -e NOTION_API_KEY=${{ secrets.NOTION_API_KEY }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Commit cache changes
-        uses: EndBug/add-and-commit@v9
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v4
         with:
-          message: Commit cache changes
-          add: sync.json
+          images: ghcr.io/${{ github.repository }}
 
-      - name: Push cache changes
-        uses: ad-m/github-push-action@master
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
